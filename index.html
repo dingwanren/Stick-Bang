@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stick Bang · 炮筒战士 网页复刻</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="stage">
+    <!-- 左侧独立 HUD 面板(在 800×600 画布之外,不遮挡游戏画面) -->
+    <div id="side-hud" class="hidden">
+      <div id="hud-preview"><canvas id="preview-canvas" width="48" height="42"></canvas><div id="preview-count">∞</div></div>
+      <div id="weapon-bar"></div>
+      <div id="hud-money">$0</div>
+      <div id="hud-level">LEVEL: 1</div>
+      <div id="hud-btns">
+        <button class="hud-btn" id="btn-mute" title="静音 (M)">M</button>
+        <button class="hud-btn" id="btn-pause" title="暂停 (P)">P</button>
+        <button class="hud-btn" id="btn-menu" title="回主菜单">menu</button>
+      </div>
+    </div>
+
+    <canvas id="cv-terrain" width="800" height="600"></canvas>
+    <canvas id="cv-entity" width="800" height="600"></canvas>
+    <canvas id="cv-fx" width="800" height="600"></canvas>
+
+    <!-- 覆盖屏 -->
+    <div id="screens">
+      <div id="screen-start" class="screen">
+        <div class="title-block">
+          <h1 class="game-title">STICK BANG</h1>
+          <div class="game-subtitle">炮筒战士 · 网页复刻版</div>
+        </div>
+        <button class="big-btn" id="btn-start" disabled>开始游戏</button>
+        <button class="big-btn" id="btn-test" style="font-size:22px; padding:6px 26px;" disabled>测试关(全弹药)</button>
+        <div class="help-block">
+          <div class="help-row"><b>← →</b> 移动</div>
+          <div class="help-row"><b>鼠标</b> 瞄准(远近=力度)</div>
+          <div class="help-row"><b>左键</b> 立即开火(无蓄力)</div>
+          <div class="help-row"><b>滚轮 / 1-9,0,Z X C V</b> 切换弹药</div>
+          <div class="help-row"><b>P</b> 暂停 &nbsp;<b>M</b> 静音</div>
+        </div>
+      </div>
+
+      <div id="screen-clear" class="screen hidden">
+        <h1 class="screen-title">LEVEL CLEAR!</h1>
+        <div class="screen-info" id="clear-info">SCORE: 0</div>
+        <div class="btn-row">
+          <button class="big-btn" id="btn-shop">商店</button>
+          <button class="big-btn" id="btn-next">下一关</button>
+        </div>
+      </div>
+
+      <div id="screen-shop" class="screen hidden">
+        <h1 class="screen-title shop-title">SHOP</h1>
+        <div id="shop-money">$0</div>
+        <div id="shop-list"></div>
+        <div id="shop-msg">&nbsp;</div>
+        <button class="big-btn" id="btn-shop-next">下一关 ></button>
+      </div>
+
+      <div id="screen-over" class="screen hidden">
+        <h1 class="screen-title gameover">GAME OVER!</h1>
+        <div class="screen-info" id="over-info">SCORE: 0</div>
+        <div class="btn-row">
+          <button class="big-btn" id="btn-continue">CONTINUE</button>
+          <button class="big-btn" id="btn-tomenu">回到标题</button>
+        </div>
+      </div>
+
+      <div id="screen-win" class="screen hidden">
+        <h1 class="screen-title">YOU WIN!</h1>
+        <div class="screen-info" id="win-info">TOTAL SCORE: 0</div>
+        <div class="btn-row">
+          <button class="big-btn" id="btn-win-menu">回到标题</button>
+        </div>
+      </div>
+
+      <div id="screen-pause" class="screen hidden overlay-pause">
+        <h1 class="screen-title">GAME PAUSED!</h1>
+        <div class="screen-info">PRESS 'P' TO CONTINUE</div>
+      </div>
+
+      <div id="screen-quit" class="screen hidden overlay-pause">
+        <h1 class="screen-title">QUIT TO MENU?</h1>
+        <div class="btn-row">
+          <button class="big-btn" id="btn-quit-yes">YES</button>
+          <button class="big-btn" id="btn-quit-no">NO</button>
+        </div>
+      </div>
+
+      <div id="toast" class="hidden">No ammunition!</div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
