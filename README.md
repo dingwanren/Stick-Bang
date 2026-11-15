@@ -99,6 +99,23 @@ powershell -File _analysis/tools/contact_sheet.ps1     # 生成帧对照表
 | sound_405 | 命中打击 | 130ms 静默后瞬时 0.75 攻击 |
 | sound_894 | 定时炸弹滴答 | 0.5s 周期脉冲 × 12s |
 
+## 发布到 GitHub Pages
+
+仓库已含自动部署工作流(`.github/workflows/deploy.yml`,push 到 main 自动构建并部署,构建产物为相对路径,子路径可用)。
+
+1. 在 GitHub 新建一个**公开仓库**(Pages 需要;Pro 账号可用私有仓库)
+2. 本地执行:
+   ```bash
+   git remote add origin https://github.com/<用户名>/<仓库名>.git
+   git push -u origin main
+   ```
+3. 仓库 **Settings → Pages → Build and deployment → Source 选 "GitHub Actions"**
+4. 推送后 Actions 自动构建部署,页面地址:`https://<用户名>.github.io/<仓库名>/`
+5. 之后每次 push 到 main 自动更新页面;也可在 Actions 页手动 Run workflow
+
+> `_analysis/`(原版 SWF 与解析工具)已在 .gitignore 中排除,不会进入公开仓库。
+> **版权提醒**:公开部署意味着公开分发从原版 SWF 提取的特效图与音频,素材版权归 FreeWorldGroup——请自行评估,勿用于商业用途。
+
 ## 已知差异(有意简化)
 
 见《复刻方案.md》§十:自设地形、无分波增援(格式已预留)、15 格弹药栏、SCORE=累计金钱、无存档、无高分榜/广告。
