@@ -59,10 +59,13 @@ export function explodeAt(b: Battle, x: number, y: number, opts: ExplodeOpts): v
     }
   }
 
-  // 桥
-  if (b.bridge && radius > 0 && !opts.ice) {
-    const broken = b.bridge.applyDamage(x, y, radius, Math.max(power, hurt, 12));
-    if (broken) Audio.play("hit", { vol: 0.7, rate: 0.8 });
+  // 桥(多桥:全部结算)
+  if (radius > 0 && !opts.ice) {
+    for (const br of b.bridges) {
+      if (br.applyDamage(x, y, radius, Math.max(power, hurt, 12))) {
+        Audio.play("hit", { vol: 0.7, rate: 0.8 });
+      }
+    }
   }
 
   // 士兵伤害(溅射衰减)
@@ -96,6 +99,12 @@ export function explodeAt(b: Battle, x: number, y: number, opts: ExplodeOpts): v
     if (d > radius + 14) continue;
     const dmg = Math.round(power * Math.max(0.3, 1 - d / (radius + 14)));
     if (dmg > 0) f.hit(dmg, d <= 17, team);
+  }
+
+  // 补给箱:任何爆炸波及即摧毁(无尽模式)
+  for (const c of b.crates) {
+    if (c.dead) continue;
+    if (dist(c.x, c.y - 10, x, y) < radius + 12) c.destroy();
   }
 }
 

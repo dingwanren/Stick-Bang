@@ -6,6 +6,7 @@ import { drawWeaponIcon } from "../battle/figures";
 export interface GameSession {
   levelIdx: number;
   isTest?: boolean; // 测试关
+  isEndless?: boolean; // 无尽试炼
   money: number;
   score: number;
   currentWeapon: number;
@@ -78,8 +79,21 @@ export class Hud {
 
   refreshMoney(): void {
     const s = this.sessionGetter();
-    if (s) this.moneyEl.textContent = `$${s.money}`;
+    if (!s) return;
+    if (s.isEndless) return; // 无尽模式:金钱栏由 updateEndless 接管(波次/击杀)
+    this.moneyEl.textContent = `$${s.money}`;
   }
+
+  /** 无尽模式:金钱栏 → 波次,关卡栏 → 击杀(每帧调用,值不变时跳过 DOM 写入) */
+  updateEndless(wave: number, kills: number): void {
+    if (wave === this.lastWave && kills === this.lastKills) return;
+    this.lastWave = wave;
+    this.lastKills = kills;
+    this.moneyEl.textContent = `第${wave}波`;
+    this.levelEl.textContent = `击杀:${kills}`;
+  }
+  private lastWave = -1;
+  private lastKills = -1;
 
   refreshPreview(): void {
     const s = this.sessionGetter();

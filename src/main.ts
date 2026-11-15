@@ -26,6 +26,7 @@ async function boot(): Promise<void> {
   loading.remove();
   btnStart.disabled = false;
   (document.getElementById("btn-test") as HTMLButtonElement).disabled = false;
+  (document.getElementById("btn-endless") as HTMLButtonElement).disabled = false;
 
   const game = new Game();
   (window as any).__game = game; // 调试/测试入口

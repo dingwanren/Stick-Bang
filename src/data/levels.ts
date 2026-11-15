@@ -19,12 +19,24 @@ export interface FlyEnemyCfg {
   bombError: number;
 }
 
+/** 绳索(不可摧毁,不挡弹):从平台端垂到地面,供 ↑↓ 攀爬 */
+export interface Rope {
+  x: number;
+  topY: number;
+  bottomY: number;
+}
+
 export interface Level {
   name: string;
   test?: boolean; // 测试关:全弹药、敌人重生、R 重开
   terrain: {
-    platforms: [number, number, number, number][];
-    bridge?: { x: number; y: number; w: number; segHp: number }; // 按 40px 分段
+    width?: number; // 世界宽(默认 800;无尽模式 1600)
+    height?: number; // 世界高(默认 600;无尽模式 800)
+    platforms: ([number, number, number, number] | [number, number, number, number, number])[]; // 表土(可破坏);五元组=斜坡 [x,y,w,h,y2右端顶面]
+    bedrock?: ([number, number, number, number] | [number, number, number, number, number])[]; // 基岩(永不破坏)
+    bridge?: { x: number; y: number; w: number; segHp: number }; // 单桥(按 40px 分段)
+    bridges?: { x: number; y: number; w: number; segHp: number }[]; // 多桥
+    ropes?: [number, number, number][]; // [x, topY, bottomY]
     waterY: number;
   };
   playerStart: [number, number];
@@ -179,4 +191,45 @@ export const TEST_LEVEL: Level = {
     fly: [{ hp: 60, patrol: [300, 620], bombPower: 10, reload: 240, bombError: 0.1 }],
   },
   tip: "所有弹药已备满。按 R 重新开始。",
+};
+
+// 无尽试炼 v3「三岛天路」:1600×800 整图,三座**纯土**斜坡岛被两水道隔开(单层材质,炸穿落水),
+// 空中 3 块短基岩平台(不可摧毁、不挡主弹道,与岛不叠层)。
+// 绳索贯通世界底:绘制按当前地表剪裁,地形怎么破坏都能接绳爬回(任何时候都能上去)。
+// 每波开始工兵整地(表土复原),波内破坏自由(挖坑陷敌/炸岸淹敌)。
+// 敌人由 Battle 波次生成器按预算刷出,这里 ground/fly 留空。
+export const ENDLESS_LEVEL: Level = {
+  name: "无尽试炼",
+  terrain: {
+    width: 1600,
+    height: 800,
+    platforms: [
+      // 三岛纯土(斜坡:外端高、水道边低;底部统一到 720,略浸水面 700 之下)
+      [0, 500, 430, 220, 560], // 左岛:顶 500 → 560,土到底
+      [600, 560, 200, 160, 535], // 中岛西坡:升到顶 535
+      [800, 535, 200, 185, 540], // 中岛东坡:微降 540
+      [1180, 560, 420, 160, 500], // 右岛:顶 560 → 500
+    ],
+    bedrock: [
+      // 仅空中平台(基岩,短,不挡主弹道;与岛体不叠层)
+      [398, 340, 214, 22], // P1 西天桥(横跨左水道,两端悬出岛边)
+      [988, 340, 214, 22], // P2 东天桥
+      [745, 210, 110, 20], // P3 中央狙击台
+    ],
+    // 绳索 [x, topY(平台底), bottomY(贯通世界底)] —— 绘制按当前地表剪裁,炸烂了也能爬
+    ropes: [
+      [402, 362, 800], // P1 西端 → 左岛
+      [608, 362, 800], // P1 东端 → 中岛
+      [992, 362, 800], // P2 西端 → 中岛
+      [1198, 362, 800], // P2 东端 → 右岛
+      [748, 230, 800], // P3 → 中岛顶(狙击位)
+    ],
+    waterY: 700,
+  },
+  playerStart: [800, 535],
+  enemies: {
+    ground: [],
+    fly: [],
+  },
+  tip: "↑↓ 爬绳上天路 · Q 双发 · E 散射 · 弹药靠补给箱 · 生存到底!",
 };

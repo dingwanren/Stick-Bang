@@ -63,6 +63,14 @@ export class Bridge {
     return deck !== null && y >= deck && y < deck + 7;
   }
 
+  /** 工兵修复:全部段复原(无尽模式每 5 波章节调用) */
+  repair(): void {
+    for (const s of this.segments) {
+      s.alive = true;
+      s.hp = this.def.segHp;
+    }
+  }
+
   draw(ctx: CanvasRenderingContext2D): void {
     for (const s of this.segments) {
       if (!s.alive) continue;

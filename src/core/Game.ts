@@ -6,14 +6,15 @@ import { Audio } from "./Audio";
 import { Battle } from "../battle/Battle";
 import { Hud, newSession, type GameSession } from "../ui/Hud";
 import { WeaponBar, WEAPON_KEYS } from "../ui/WeaponBar";
+import { SkillBar } from "../ui/SkillBar";
 import { Shop } from "../ui/Shop";
-import { LEVELS, TEST_LEVEL } from "../data/levels";
+import { LEVELS, TEST_LEVEL, ENDLESS_LEVEL } from "../data/levels";
 import { WEAPONS } from "../data/weapons";
 
 export type { GameSession };
 
-const W = 800;
-const H = 600;
+const DEFAULT_W = 800;
+const DEFAULT_H = 600;
 const PANEL_W = 76; // 左侧 HUD 面板宽
 const STEP_MS = 1000 / 60;
 
@@ -28,9 +29,12 @@ export class Game {
   paused = false;
   session: GameSession | null = null;
   battle: Battle | null = null;
+  viewW = DEFAULT_W; // 当前世界宽(=视口宽,整图显示)
+  viewH = DEFAULT_H; // 当前世界高
 
   hud!: Hud;
   weaponBar!: WeaponBar;
+  skillBar!: SkillBar;
   shop!: Shop;
 
   // 输入
@@ -57,11 +61,11 @@ export class Game {
     this.ctxE = (document.getElementById("cv-entity") as HTMLCanvasElement).getContext("2d")!;
     this.ctxF = (document.getElementById("cv-fx") as HTMLCanvasElement).getContext("2d")!;
 
-    // 舞台缩放(含左侧面板)
+    // 舞台缩放(含左侧面板;世界尺寸随关卡)
     const fit = () => {
-      const scale = Math.min(window.innerWidth / (W + PANEL_W), window.innerHeight / H);
-      const scaledW = (W + PANEL_W) * scale;
-      const scaledH = H * scale;
+      const scale = Math.min(window.innerWidth / (this.viewW + PANEL_W), window.innerHeight / this.viewH);
+      const scaledW = (this.viewW + PANEL_W) * scale;
+      const scaledH = this.viewH * scale;
       stage.style.left = `${(window.innerWidth - scaledW) / 2}px`;
       stage.style.top = `${(window.innerHeight - scaledH) / 2}px`;
       stage.style.transformOrigin = "top left";
@@ -85,8 +89,11 @@ export class Game {
       if (k === "r" && this.state === "playing" && this.session?.isTest) {
         this.startLevel();
       }
-      // 弹药快捷键:1-9/0/Z/X/C/V(顺序与弹格角标一致)
+      // 技能:Q 双发 / E 散射(无尽模式,下一发生效)
       if (this.state === "playing") {
+        if (k === "q") this.battle?.armSkill("burst");
+        else if (k === "e") this.battle?.armSkill("spread");
+        // 弹药快捷键:1-9/0/Z/X/C/V(顺序与弹格角标一致)
         const kIdx = WEAPON_KEYS.indexOf(k.toUpperCase());
         if (kIdx >= 0) this.weaponBar.selectSlot(kIdx);
       }
@@ -99,8 +106,8 @@ export class Game {
       (t.id === "cv-terrain" || t.id === "cv-entity" || t.id === "cv-fx");
     const stageMouse = (e: MouseEvent) => {
       const crect = (e.target as HTMLCanvasElement).getBoundingClientRect();
-      this.mouseX = ((e.clientX - crect.left) / crect.width) * W;
-      this.mouseY = ((e.clientY - crect.top) / crect.height) * H;
+      this.mouseX = ((e.clientX - crect.left) / crect.width) * this.viewW;
+      this.mouseY = ((e.clientY - crect.top) / crect.height) * this.viewH;
     };
     stage.addEventListener("mousemove", (e) => {
       if (isGameCanvas(e.target)) stageMouse(e);
@@ -154,6 +161,7 @@ export class Game {
         Audio.play("hit", { vol: 0.3, rate: 1.6 });
       }
     );
+    this.skillBar = new SkillBar(document.getElementById("skill-bar")!);
     this.hud = new Hud(
       document.getElementById("side-hud")!,
       () => this.session,
@@ -170,11 +178,16 @@ export class Game {
     // 屏幕按钮
     document.getElementById("btn-start")!.addEventListener("click", () => this.startNewRun(0));
     document.getElementById("btn-test")!.addEventListener("click", () => this.startTestRun());
+    document.getElementById("btn-endless")!.addEventListener("click", () => this.startEndlessRun());
     document.getElementById("btn-shop")!.addEventListener("click", () => this.showShop());
     document.getElementById("btn-next")!.addEventListener("click", () => this.gotoNextLevel());
     document.getElementById("btn-continue")!.addEventListener("click", () => {
       if (this.session?.isTest) {
         this.startTestRun();
+        return;
+      }
+      if (this.session?.isEndless) {
+        this.startEndlessRun();
         return;
       }
       const lv = this.session?.levelIdx ?? 0;
@@ -261,27 +274,70 @@ export class Game {
     this.startLevel();
   }
 
+  /** 无尽试炼:普通弹无限,特殊弹半量配发,波次无限,死亡即结算 */
+  startEndlessRun(): void {
+    Audio.ensure();
+    Audio.startBgm();
+    this.session = newSession(0);
+    this.session.isEndless = true;
+    for (let i = 1; i < WEAPONS.length - 1; i++) {
+      if (WEAPONS[i].hidden) continue;
+      this.session.setAmmo(i, Math.max(1, Math.floor(WEAPONS[i].carryMax / 2)));
+    }
+    this.startLevel();
+  }
+
+  /** 按关卡世界尺寸重设画布(属性=世界像素,CSS=布局尺寸),整图显示 */
+  private setViewSize(w: number, h: number): void {
+    this.viewW = w;
+    this.viewH = h;
+    for (const id of ["cv-terrain", "cv-entity", "cv-fx"]) {
+      const cv = document.getElementById(id) as HTMLCanvasElement;
+      cv.width = w;
+      cv.height = h;
+      cv.style.width = `${w}px`;
+      cv.style.height = `${h}px`;
+    }
+    const stage = document.getElementById("stage")!;
+    stage.style.width = `${PANEL_W + w}px`;
+    stage.style.height = `${h}px`;
+    window.dispatchEvent(new Event("resize"));
+  }
+
   startLevel(): void {
     const s = this.session!;
-    const level = s.isTest ? TEST_LEVEL : LEVELS[s.levelIdx];
+    const level = s.isTest ? TEST_LEVEL : s.isEndless ? ENDLESS_LEVEL : LEVELS[s.levelIdx];
+    this.setViewSize(level.terrain.width ?? DEFAULT_W, level.terrain.height ?? DEFAULT_H);
     this.battle = new Battle(this, s, level);
     this.state = "playing";
     this.paused = false;
     this.showScreen(null);
     document.getElementById("side-hud")!.classList.remove("hidden");
-    this.hud.setLevel(s.isTest ? "TEST" : s.levelIdx + 1);
+    this.hud.setLevel(s.isTest ? "TEST" : s.isEndless ? "无尽" : s.levelIdx + 1);
     this.hud.refreshMoney();
     this.hud.refreshPreview();
     this.weaponBar.select(s.currentWeapon);
     this.weaponBar.refresh();
 
     // 关卡横幅
-    this.banner.textContent = s.isTest ? `试验场 · 按R重开` : `LEVEL ${s.levelIdx + 1} · ${level.name}`;
+    this.banner.textContent = s.isTest
+      ? `试验场 · 按R重开`
+      : s.isEndless
+        ? `无尽试炼 · 生存到底!`
+        : `LEVEL ${s.levelIdx + 1} · ${level.name}`;
     this.banner.style.opacity = "1";
     const tip = document.getElementById("level-tip") as HTMLElement;
     tip.textContent = level.tip ?? "";
     tip.style.opacity = "1";
-    this.bannerT = s.isTest ? 150 : 210;
+    this.bannerT = s.isTest ? 150 : s.isEndless ? 170 : 210;
+  }
+
+  /** 波次横幅(无尽模式,复用关卡横幅元素) */
+  showWaveBanner(text: string): void {
+    this.banner.textContent = text;
+    this.banner.style.opacity = "1";
+    (document.getElementById("level-tip") as HTMLElement).style.opacity = "0";
+    this.bannerT = 110;
   }
 
   showLevelClear(): void {
@@ -308,7 +364,12 @@ export class Game {
 
   showGameOver(): void {
     this.state = "gameover";
-    document.getElementById("over-info")!.textContent = `SCORE: ${this.session!.score}`;
+    const el = document.getElementById("over-info")!;
+    if (this.session?.isEndless && this.battle) {
+      el.textContent = `存活 ${this.battle.wave} 波 · 击杀 ${this.battle.kills}`;
+    } else {
+      el.textContent = `SCORE: ${this.session!.score}`;
+    }
     this.showScreen("screen-over");
   }
 
@@ -363,6 +424,8 @@ export class Game {
     const input = {
       left: this.keys.has("arrowleft") || this.keys.has("a"),
       right: this.keys.has("arrowright") || this.keys.has("d"),
+      up: this.keys.has("arrowup") || this.keys.has("w"),
+      down: this.keys.has("arrowdown") || this.keys.has("s"),
       mouseX: this.mouseX,
       mouseY: this.mouseY,
       fire: this.clickQueued,
@@ -376,6 +439,8 @@ export class Game {
   private render(): void {
     if (this.state === "playing" && this.battle) {
       this.battle.render(this.ctxT, this.ctxE, this.ctxF);
+      this.skillBar.update(this.battle);
+      if (this.session?.isEndless) this.hud.updateEndless(this.battle.wave, this.battle.kills);
     }
   }
 }

@@ -12,6 +12,7 @@
     <div id="side-hud" class="hidden">
       <div id="hud-preview"><canvas id="preview-canvas" width="48" height="42"></canvas><div id="preview-count">∞</div></div>
       <div id="weapon-bar"></div>
+      <div id="skill-bar"></div>
       <div id="hud-money">$0</div>
       <div id="hud-level">LEVEL: 1</div>
       <div id="hud-btns">
@@ -34,11 +35,13 @@
         </div>
         <button class="big-btn" id="btn-start" disabled>开始游戏</button>
         <button class="big-btn" id="btn-test" style="font-size:22px; padding:6px 26px;" disabled>测试关(全弹药)</button>
+        <button class="big-btn" id="btn-endless" style="font-size:22px; padding:6px 26px;" disabled>无尽试炼</button>
         <div class="help-block">
           <div class="help-row"><b>← →</b> 移动</div>
           <div class="help-row"><b>鼠标</b> 瞄准(远近=力度)</div>
           <div class="help-row"><b>左键</b> 立即开火(无蓄力)</div>
           <div class="help-row"><b>滚轮 / 1-9,0,Z X C V</b> 切换弹药</div>
+          <div class="help-row"><b>Q / E</b> 双发 / 散射技能(无尽试炼,下一发生效)</div>
           <div class="help-row"><b>P</b> 暂停 &nbsp;<b>M</b> 静音</div>
         </div>
       </div>

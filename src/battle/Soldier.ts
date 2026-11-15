@@ -3,6 +3,7 @@
 
 import type { Battle } from "./Battle";
 import { WEAPONS, statOf, type WeaponDef } from "../data/weapons";
+import type { Rope } from "../data/levels";
 import { GRAVITY } from "./projectiles/Ballistic";
 import { Ballistic } from "./projectiles/Ballistic";
 import { Parachute } from "./projectiles/Parachute";
@@ -16,6 +17,8 @@ export type Team = "player" | "enemy";
 export interface SoldierInput {
   left: boolean;
   right: boolean;
+  up: boolean; // 接绳/向上爬
+  down: boolean; // 向下爬
   mouseX: number;
   mouseY: number;
   fire: boolean; // 本帧点击
@@ -45,6 +48,12 @@ export class Soldier {
   fallFrom = 0; // 开始下落时的 y(计算坠落高度/惊呼)
   screamed = false;
   lastPower = 1; // 当前力度(玩家:鼠标距人物远近决定,0.25~1;AI 恒为 1)
+  // 技能武装(无尽模式,玩家专用):武装后下一次抛射击发生效,击发才消耗并起 CD
+  armedBurst = false; // Q 双发:下一发变 2 连发
+  armedSpread = false; // E 散射:下一发变 3 散射
+  // 绳索攀爬(无尽模式):onRope 时锁定绳 x、无重力、可开火;←→ 跳离
+  onRope: Rope | null = null;
+  ropeCd = 0; // 跳离后的短暂不可接绳(防按住↑+←→抖动)
 
   constructor(
     public b: Battle,
@@ -114,13 +123,52 @@ export class Soldier {
       this.lastPower = Math.min(1, dist / 280);
     }
 
-    // 移动(仅地面行走;空中只保留微小漂移,防止"滑翔"过坑)
-    let moveDir = 0;
-    if (input && canAct && this.stunFor <= 0) {
-      if (input.left) moveDir = -1;
-      else if (input.right) moveDir = 1;
+    // 接绳:站立或下落中按 ↑,绳在附近即接住(可抓下坠)
+    if (this.ropeCd > 0) this.ropeCd--;
+    if (!this.onRope && this.ropeCd <= 0 && input?.up && canAct && this.stunFor <= 0) {
+      const rope = b.ropes.find(
+        (r) => Math.abs(this.x - r.x) <= 16 && this.y >= r.topY - 12 && this.y <= r.bottomY + 14
+      );
+      if (rope) {
+        this.onRope = rope;
+        this.grounded = false;
+        this.vy = 0;
+        this.x = rope.x;
+        this.fallFrom = this.y;
+        this.screamed = false;
+      }
     }
-    if (moveDir !== 0) {
+
+    // 移动:攀爬 / 地面行走 / 空中漂移
+    if (this.onRope) {
+      // ---- 攀爬:↑↓ 爬,←→ 跳离(小跳交给空中物理) ----
+      let climb = 0;
+      if (input && canAct && this.stunFor <= 0) {
+        if (input.up) climb = -1;
+        else if (input.down) climb = 1;
+        if (input.left || input.right) {
+          this.onRope = null;
+          this.ropeCd = 18;
+          this.vy = -1.6;
+          this.x += input.left ? -4 : 4;
+          this.fallFrom = this.y;
+          this.screamed = false;
+        }
+      }
+      if (this.onRope) {
+        if (climb !== 0) this.climbStep(climb);
+        else {
+          this.x = this.onRope.x;
+          this.vy = 0;
+        }
+      }
+    } else {
+      let moveDir = 0;
+      if (input && canAct && this.stunFor <= 0) {
+        if (input.left) moveDir = -1;
+        else if (input.right) moveDir = 1;
+      }
+      if (moveDir !== 0) {
       this.facing = moveDir as 1 | -1;
       if (this.grounded) {
         this.walk(moveDir);
@@ -143,6 +191,7 @@ export class Soldier {
         }
       }
     }
+    }
 
     // 开火
     if (input?.fire && canAct && this.stunFor <= 0 && this.reload <= 0) {
@@ -155,8 +204,8 @@ export class Soldier {
       return;
     }
 
-    // 空中物理
-    if (!this.grounded) {
+    // 空中物理(攀爬中无重力)
+    if (!this.grounded && !this.onRope) {
       this.vy = Math.min(this.vy + GRAVITY, 9);
       this.y += this.vy;
       const drop = this.y - this.fallFrom;
@@ -228,6 +277,74 @@ export class Soldier {
     }
   }
 
+  /** 沿绳攀爬一步(玩家输入与 Ai 导航共用):顶部翻上平台;向下爬到实际地表(含炸后坑底)即站住,绝不钻进地形/水里 */
+  climbStep(dir: number): void {
+    const rope = this.onRope;
+    if (!rope) return;
+    this.y = Math.max(rope.topY, Math.min(rope.bottomY + 6, this.y + dir * 1.6));
+    this.x = rope.x;
+    this.vy = 0;
+    this.walkPhase += 0.12;
+    if (this.y <= rope.topY) {
+      // 顶部:翻上平台(从平台顶上方找地表)
+      this.onRope = null;
+      const g = this.b.sampleGround(rope.x, Math.max(0, rope.topY - 26));
+      if (g !== null && g <= rope.topY) {
+        this.y = g;
+        this.grounded = true;
+        this.vy = 0;
+        this.fallFrom = this.y;
+        this.screamed = false;
+      } else {
+        this.grounded = false;
+        this.fallFrom = this.y; // 绳顶无平台(兜底:直接脱手)
+      }
+      return;
+    }
+    if (dir > 0) {
+      // 向下爬:碰到当前实际地面(地形怎么炸都算数)就站住脱绳
+      const g = this.b.sampleGround(rope.x, this.y - 2);
+      if (g !== null && this.y >= g - 1) {
+        this.onRope = null;
+        this.y = g;
+        this.grounded = true;
+        this.vy = 0;
+        this.fallFrom = this.y;
+        this.screamed = false;
+        return;
+      }
+      // 快到水面:强制脱手,不许沿绳爬进水里(想下水请用←→跳离)
+      if (this.y >= this.b.waterY - 12) {
+        this.onRope = null;
+        this.grounded = false;
+        this.vy = 0;
+        this.fallFrom = this.y;
+        return;
+      }
+      if (this.y >= rope.bottomY + 6) {
+        // 绳底(贯通世界底,正常到不了这里)
+        this.onRope = null;
+        this.grounded = false;
+        this.vy = 0;
+        this.fallFrom = this.y;
+        this.screamed = false;
+      }
+    }
+  }
+
+  /** Ai 导航用:直接接绳(调用方保证位置接近绳底/绳身) */
+  tryAttachRope(rope: Rope): boolean {
+    if (this.onRope || !this.alive) return false;
+    this.onRope = rope;
+    this.grounded = false;
+    this.vy = 0;
+    this.x = rope.x;
+    this.y = Math.max(rope.topY, Math.min(rope.bottomY + 6, this.y));
+    this.fallFrom = this.y;
+    this.screamed = false;
+    return true;
+  }
+
   /** 开火:按当前武器类型生成弹丸;power=力度系数(0.25~1,轻抛~全力) */
   fire(targetX = 0, power = 1): void {
     const b = this.b;
@@ -235,7 +352,7 @@ export class Soldier {
     const lv = this.weaponLevel;
     const vEff = w.v * power;
 
-    // 弹药检查(没弹药时提示,取消发射)
+    // 弹药检查(没弹药时提示,取消发射;技能武装不消耗)
     const hasAmmo = b.consumeAmmo(this, w);
     if (!hasAmmo) {
       if (this.isPlayer) b.game.toast("No ammunition!");
@@ -254,11 +371,37 @@ export class Soldier {
       rate: 1.25 - 0.3 * power, // 小力音调高(噗),大力音调低(砰)
     });
 
+    // 技能武装结算:仅抛射类生效,击发即消耗并通知 Battle 起 CD(威力不削减,纯加弹数)
+    const burst = w.launcher === "ballistic" && this.armedBurst;
+    const spread = w.launcher === "ballistic" && this.armedSpread;
+    if (burst || spread) {
+      this.armedBurst = false;
+      this.armedSpread = false;
+      b.onSkillTriggered(burst, spread);
+    }
     const ctxObj = { b, team: this.team, weapon: w, level: lv };
+
     switch (w.launcher) {
       case "ballistic": {
         const body = w.key === "rocket" ? "rocket" : w.key === "ripper" ? "cluster" : "bomb";
-        b.projectiles.push(new Ballistic(ctxObj, mx, my, this.aimAngle, vEff, w.gScale, body, 5));
+        const baseAngle = this.aimAngle; // 连发补发也用触发瞬间的角度
+        const angles = spread ? [-SPREAD_ANGLE, 0, SPREAD_ANGLE] : [0];
+        for (const da of angles) {
+          b.projectiles.push(new Ballistic(ctxObj, mx, my, baseAngle + da, vEff, w.gScale, body, 5));
+        }
+        if (burst) {
+          // 第二连发延迟 6 帧:同弹道同落点补发一轮(散射则 3 发齐补)
+          for (const da of angles) {
+            b.pendingShots.push({
+              t: 6,
+              run: () => {
+                if (b.status === "playing") {
+                  b.projectiles.push(new Ballistic(ctxObj, mx, my, baseAngle + da, vEff, w.gScale, body, 5));
+                }
+              },
+            });
+          }
+        }
         break;
       }
       case "parachute": {
@@ -388,5 +531,8 @@ function shootSoundOf(w: WeaponDef): string {
   if (w.launcher === "ballistic") return w.key === "rocket" ? "shoot_c" : "shoot_a";
   return "shoot_b";
 }
+
+/** 散射扇形半角(±8°) */
+const SPREAD_ANGLE = (8 * Math.PI) / 180;
 
 export { statOf };

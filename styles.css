@@ -117,6 +117,71 @@ html, body {
 .wslot.sel { border-color: #ffcc00; background: #fff3c4; box-shadow: 0 0 0 2px #ffcc00, 0 0 8px rgba(255, 204, 0, .6); }
 .wslot.empty { opacity: .45; }
 
+/* ---------- 技能栏(无尽试炼:Q 双发 / E 散射) ---------- */
+#skill-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+  width: 100%;
+  flex: 0 0 auto;
+}
+.skill-cell {
+  position: relative;
+  height: 46px;
+  background: #16303c;
+  border: 2px solid #2c4652;
+  border-radius: 4px;
+  overflow: hidden;
+  text-align: center;
+}
+.skill-cell.off { visibility: hidden; }
+.skill-cell .sk-key {
+  position: absolute;
+  left: 1px; top: 1px;
+  font-size: 10px;
+  line-height: 1.15;
+  padding: 0 3px;
+  background: #1a1208;
+  color: #ffd040;
+  border-radius: 2px 0 3px 0;
+  z-index: 2;
+}
+.skill-cell .sk-name {
+  font-family: var(--hand);
+  font-size: 15px;
+  color: #cfe8f8;
+  line-height: 30px;
+  text-shadow: 1px 1px 0 var(--stroke);
+}
+.skill-cell .sk-cd {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 0%;
+  background: rgba(10, 20, 24, 0.78);
+  z-index: 1;
+}
+.skill-cell .sk-state {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  font-family: var(--hand);
+  font-size: 11px;
+  color: #8fb8cc;
+  line-height: 1.1;
+  z-index: 2;
+}
+.skill-cell .sk-armed {
+  display: none;
+  position: absolute;
+  inset: 0;
+  border: 2px solid #ffcc00;
+  box-shadow: inset 0 0 8px rgba(255, 204, 0, .7);
+  z-index: 3;
+  pointer-events: none;
+}
+.skill-cell.armed { border-color: #ffcc00; }
+.skill-cell.armed .sk-name { color: #ffcc00; }
+.skill-cell.armed .sk-armed { display: block; }
+
 #hud-money {
   font-family: var(--hand);
   font-size: 17px;

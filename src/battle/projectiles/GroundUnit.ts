@@ -93,8 +93,8 @@ export class Unit {
           return;
         }
       }
-      if (b.bridge && b.bridge.solidAt(this.x, this.y)) {
-        this.y = b.bridge.deckYAt(this.x)!;
+      if (b.bridgeSolidAt(this.x, this.y)) {
+        this.y = b.bridgeDeckYAt(this.x) ?? this.y;
         this.land(b);
         return;
       }

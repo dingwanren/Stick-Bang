@@ -58,12 +58,12 @@ export class FlyingEnemy {
     this.pickWander();
   }
 
-  /** 选一个徘徊目标点:水平范围 = 巡逻带向两侧各扩 100,垂直 50~190 */
+  /** 选一个徘徊目标点:水平范围 = 巡逻带向两侧各扩 100,垂直随世界高度 */
   private pickWander(): void {
     const minX = Math.max(40, this.patrolMin - 100);
-    const maxX = Math.min(760, this.patrolMax + 100);
+    const maxX = Math.min(this.b.terrain.width - 40, this.patrolMax + 100);
     this.wx = minX + Math.random() * (maxX - minX);
-    this.wy = 50 + Math.random() * 140;
+    this.wy = 60 + Math.random() * (this.b.terrain.height >= 800 ? 250 : 140);
     this.wanderT = 180 + Math.random() * 120; // 3~5 秒换目标
   }
 
@@ -102,15 +102,15 @@ export class FlyingEnemy {
       const d = Math.hypot(dx, dy) || 1;
       this.x += (dx / d) * this.speed;
       this.y += (dy / d) * this.speed * 0.8 + Math.sin(this.bob) * 0.25;
-      this.x = Math.max(24, Math.min(776, this.x));
-      this.y = Math.max(40, Math.min(230, this.y));
+      this.x = Math.max(24, Math.min(this.b.terrain.width - 24, this.x));
+      this.y = Math.max(40, Math.min(this.b.terrain.height >= 800 ? 320 : 230, this.y));
       if (d < 24 || this.wanderT <= 0) this.pickWander();
       // 装填完毕且有目标 → 进入俯冲
       this.reload--;
       if (p && p.alive && this.reload <= 0) {
         this.mode = "dive";
         this.stateT = 0;
-        this.dropY = 175 + Math.random() * 30;
+        this.dropY = (this.b.terrain.height >= 800 ? 260 : 175) + Math.random() * 30;
         this.dropTargetX = p.x + Math.sign(p.vxEstimate()) * 52 + (Math.random() - 0.5) * 120 * this.bombError * 10;
       }
     } else if (this.mode === "dive") {

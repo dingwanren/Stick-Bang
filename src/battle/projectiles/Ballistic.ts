@@ -56,7 +56,7 @@ export class Ballistic {
       this.age++;
 
       // 左右出界(上下不拦截:大力射击可飞出屏幕顶,受重力后回落——原版行为)
-      if (this.x < -40 || this.x > 840) {
+      if (this.x < -40 || this.x > b.terrain.width + 40) {
         this.dead = true;
         return;
       }
@@ -101,7 +101,7 @@ export class Ballistic {
 
       // 桥面 / 地形:碰到即结算(空爆弹在此分裂,其余爆炸)
       const hitSolid =
-        (b.bridge !== null && b.bridge.solidAt(this.x, this.y)) ||
+        b.bridgeSolidAt(this.x, this.y) ||
         b.terrain.solidAt(this.x, this.y);
       if (hitSolid) {
         this.onTerrain(b);
@@ -137,7 +137,7 @@ export class Ballistic {
     // 生成点抬到地表之上,避免碎片出生在土里即刻自爆
     let baseY = this.y;
     let tries = 0;
-    while (tries < 30 && (b.terrain.solidAt(this.x, baseY) || (b.bridge !== null && b.bridge.solidAt(this.x, baseY)))) {
+    while (tries < 30 && (b.terrain.solidAt(this.x, baseY) || b.bridgeSolidAt(this.x, baseY))) {
       baseY -= 3;
       tries++;
     }

@@ -61,7 +61,7 @@ export class Parachute extends Unit {
         this.chute = true;
         this.shootDown(b);
       }
-      this.x = Math.max(8, Math.min(792, this.x));
+      this.x = Math.max(8, Math.min(b.terrain.width - 8, this.x));
 
       // 直击
       for (const s of b.soldiers) {
@@ -71,8 +71,8 @@ export class Parachute extends Unit {
           return;
         }
       }
-      if (b.bridge && b.bridge.solidAt(this.x, this.y)) {
-        this.y = b.bridge.deckYAt(this.x)!;
+      if (b.bridgeSolidAt(this.x, this.y)) {
+        this.y = b.bridgeDeckYAt(this.x) ?? this.y;
         this.land(b);
         return;
       }
