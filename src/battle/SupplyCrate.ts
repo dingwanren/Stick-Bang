@@ -43,17 +43,25 @@ export class SupplyCrate {
     }
   }
 
-  /** 玩家拾取:回血 + 补满当前武器 */
+  /** 玩家拾取:回血 + 随机 3 种持有武器各补满(不再只补当前手持) */
   collect(): void {
     const b = this.b;
     const s = b.game.session;
     if (!s) return;
     b.player.heal(25);
     b.fx.text(this.x, this.y - 40, "+25", "#40c820", 18);
-    const idx = s.currentWeapon;
-    if (idx > 0 && !WEAPONS[idx].hidden) {
-      s.setAmmo(idx, WEAPONS[idx].carryMax);
-      b.fx.text(this.x, this.y - 62, `${WEAPONS[idx].name} 补满!`, "#ffd040", 15);
+    // 池 = 开局发放过的商店武器(全部非 hidden);随机抽 3 种各补满
+    const pool: number[] = [];
+    for (let i = 1; i < WEAPONS.length - 1; i++) {
+      if (!WEAPONS[i].hidden) pool.push(i);
+    }
+    const picks: number[] = [];
+    while (picks.length < 3 && pool.length > 0) {
+      picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    }
+    for (const i of picks) s.setAmmo(i, WEAPONS[i].carryMax);
+    if (picks.length > 0) {
+      b.fx.text(this.x, this.y - 62, picks.map((i) => WEAPONS[i].name).join("·") + " 补满!", "#ffd040", 14);
     }
     b.game.weaponBar.refresh();
     b.game.hud.refreshPreview();

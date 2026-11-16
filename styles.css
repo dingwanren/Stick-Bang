@@ -135,6 +135,8 @@ html, body {
   text-align: center;
 }
 .skill-cell.off { visibility: hidden; }
+.skill-cell.locked { opacity: .38; }
+.skill-cell.locked .sk-name { color: #6c8898; }
 .skill-cell .sk-key {
   position: absolute;
   left: 1px; top: 1px;
@@ -311,6 +313,8 @@ html, body {
 .help-block b { color: var(--ui-yellow); }
 
 .overlay-pause { background: rgba(6, 12, 16, .6); }
+/* 暂停/退出确认只盖画布:露出左侧弹药格,可查看/切换武器 */
+#screen-pause, #screen-quit { left: 76px; }
 
 /* ---------- 商店 ---------- */
 #screen-shop { justify-content: flex-start; padding-top: 14px; gap: 10px; }

@@ -5,8 +5,8 @@
 import type { Battle } from "../battle/Battle";
 
 const SKILLS = [
-  { kind: "burst" as const, key: "Q", name: "双发", cdFrames: 180 },
-  { kind: "spread" as const, key: "E", name: "散射", cdFrames: 300 },
+  { kind: "burst" as const, key: "Q", name: "双发", cdFrames: 180, unlockText: "第3波" },
+  { kind: "spread" as const, key: "E", name: "散射", cdFrames: 270, unlockText: "第5波后" },
 ];
 
 export class SkillBar {
@@ -31,7 +31,7 @@ export class SkillBar {
     }
   }
 
-  /** 每帧由 Game.render 调用:同步 CD/武装状态到 DOM */
+  /** 每帧由 Game.render 调用:同步锁定/CD/武装状态到 DOM */
   update(b: Battle | null): void {
     const show = b !== null && b.isEndless;
     for (let i = 0; i < SKILLS.length; i++) {
@@ -39,6 +39,13 @@ export class SkillBar {
       const cell = this.cells[i];
       cell.classList.toggle("off", !show);
       if (!show || !b) continue;
+      const unlocked = s.kind === "burst" ? b.skillUnlocked.burst : b.skillUnlocked.spread;
+      cell.classList.toggle("locked", !unlocked);
+      if (!unlocked) {
+        this.cdEls[i].style.height = "0%";
+        this.stateEls[i].textContent = s.unlockText;
+        continue;
+      }
       const armed = s.kind === "burst" ? b.player.armedBurst : b.player.armedSpread;
       const cd = s.kind === "burst" ? b.skillCd.burst : b.skillCd.spread;
       cell.classList.toggle("armed", armed);

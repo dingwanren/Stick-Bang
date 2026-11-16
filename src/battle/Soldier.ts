@@ -371,9 +371,10 @@ export class Soldier {
       rate: 1.25 - 0.3 * power, // 小力音调高(噗),大力音调低(砰)
     });
 
-    // 技能武装结算:仅抛射类生效,击发即消耗并通知 Battle 起 CD(威力不削减,纯加弹数)
-    const burst = w.launcher === "ballistic" && this.armedBurst;
-    const spread = w.launcher === "ballistic" && this.armedSpread;
+    // 技能武装结算:除修理工外全兵种生效,击发即消耗并通知 Battle 起 CD(威力不削减,纯加弹数)
+    const skillable = w.custom !== "repair";
+    const burst = skillable && this.armedBurst;
+    const spread = skillable && this.armedSpread;
     if (burst || spread) {
       this.armedBurst = false;
       this.armedSpread = false;
@@ -381,42 +382,42 @@ export class Soldier {
     }
     const ctxObj = { b, team: this.team, weapon: w, level: lv };
 
-    switch (w.launcher) {
-      case "ballistic": {
-        const body = w.key === "rocket" ? "rocket" : w.key === "ripper" ? "cluster" : "bomb";
-        const baseAngle = this.aimAngle; // 连发补发也用触发瞬间的角度
-        const angles = spread ? [-SPREAD_ANGLE, 0, SPREAD_ANGLE] : [0];
-        for (const da of angles) {
+    // 双发/散射通用化:按 角度×连发 展开生成(抛射弹/落地单位/伞兵/自飞单位一视同仁)
+    const baseAngle = this.aimAngle; // 连发补发也用触发瞬间的角度
+    const angles = spread ? [-SPREAD_ANGLE, 0, SPREAD_ANGLE] : [0];
+    const spawnOne = (da: number): void => {
+      switch (w.launcher) {
+        case "ballistic": {
+          const body = w.key === "rocket" ? "rocket" : w.key === "ripper" ? "cluster" : "bomb";
           b.projectiles.push(new Ballistic(ctxObj, mx, my, baseAngle + da, vEff, w.gScale, body, 5));
+          break;
         }
-        if (burst) {
-          // 第二连发延迟 6 帧:同弹道同落点补发一轮(散射则 3 发齐补)
-          for (const da of angles) {
-            b.pendingShots.push({
-              t: 6,
-              run: () => {
-                if (b.status === "playing") {
-                  b.projectiles.push(new Ballistic(ctxObj, mx, my, baseAngle + da, vEff, w.gScale, body, 5));
-                }
-              },
-            });
-          }
+        case "parachute": {
+          // 精英伞兵:目标是点击点(玩家)/玩家位置(敌人);角度差让落点自然散开
+          const tx = this.isPlayer ? targetX : b.player ? b.player.x + (Math.random() - 0.5) * 60 : this.x;
+          b.units.push(new Parachute(b, this.team, w, lv, mx, my, baseAngle + da, vEff, tx));
+          break;
         }
-        break;
+        case "flyer": {
+          b.playerFlyers.push(new Flyer(b, this.team, w, lv, mx, my, baseAngle + da, vEff));
+          break;
+        }
+        default: {
+          // ground:落地单位(冰冻/燃烧/刺杀/推挤/定时/挖洞),角度差让落点散开
+          b.units.push(new Unit(b, this.team, w, lv, mx, my, baseAngle + da, vEff));
+        }
       }
-      case "parachute": {
-        // 精英伞兵:目标是点击点(玩家)/玩家位置(敌人)
-        const tx = this.isPlayer ? targetX : b.player ? b.player.x + (Math.random() - 0.5) * 60 : this.x;
-        b.units.push(new Parachute(b, this.team, w, lv, mx, my, this.aimAngle, vEff, tx));
-        break;
-      }
-      case "flyer": {
-        b.playerFlyers.push(new Flyer(b, this.team, w, lv, mx, my, this.aimAngle, vEff));
-        break;
-      }
-      case "ground": {
-        b.units.push(new Unit(b, this.team, w, lv, mx, my, this.aimAngle, vEff));
-        break;
+    };
+    for (const da of angles) spawnOne(da);
+    if (burst) {
+      // 第二连发延迟 6 帧:同弹道同落点补发一轮(散射则 3 发齐补)
+      for (const da of angles) {
+        b.pendingShots.push({
+          t: 6,
+          run: () => {
+            if (b.status === "playing") spawnOne(da);
+          },
+        });
       }
     }
   }

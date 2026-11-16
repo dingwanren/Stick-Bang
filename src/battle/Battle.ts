@@ -27,16 +27,17 @@ interface SpawnOrder {
   make: () => void;
 }
 
-/** 无尽模式兵种解锁表(按预算随机组合;kit 里的 w = 武器表索引) */
+/** 无尽模式兵种解锁表(每波解锁一种;kit 里的 w = 武器表索引) */
 const ENDLESS_ROSTER = [
-  { minWave: 1, cost: 60, hp: 100, kit: [] as { w: number; count: number }[] },
-  { minWave: 3, cost: 90, hp: 90, kit: [{ w: 3, count: 2 }] }, // 冰冻兵
-  { minWave: 5, cost: 110, hp: 110, kit: [{ w: 4, count: 2 }] }, // 燃烧兵
-  { minWave: 8, cost: 100, hp: 100, kit: [{ w: 12, count: 2 }] }, // 挖洞兵
-  { minWave: 10, cost: 180, hp: 150, kit: [{ w: 3, count: 1 }] }, // 精英
-  { minWave: 12, cost: 200, hp: 220, kit: [{ w: 13, count: 1 }] }, // 重装(火箭)
+  { minWave: 1, name: "基础炮兵", cost: 60, hp: 100, kit: [] as { w: number; count: number }[] },
+  { minWave: 2, name: "冰冻兵", cost: 90, hp: 90, kit: [{ w: 3, count: 2 }] },
+  { minWave: 3, name: "燃烧兵", cost: 110, hp: 110, kit: [{ w: 4, count: 2 }] },
+  { minWave: 4, name: "刺杀兵", cost: 100, hp: 100, kit: [{ w: 7, count: 2 }] },
+  { minWave: 5, name: "精英", cost: 180, hp: 150, kit: [{ w: 3, count: 1 }] },
+  { minWave: 6, name: "重装兵", cost: 200, hp: 220, kit: [{ w: 13, count: 1 }] },
 ];
-const SKILL_CD = { burst: 180, spread: 300 }; // 帧(3s / 5s)
+const SKILL_CD = { burst: 180, spread: 270 }; // 帧(3s / 4.5s,按每发 1.5s)
+const SKILL_UNLOCK_WAVE = { burst: 3, spread: 6 }; // 散射=打赢第5波(第6波开场解锁)
 const MAX_ENEMIES = 6; // 全场敌人上限(超出排队补位)
 
 export class Battle {
@@ -67,8 +68,9 @@ export class Battle {
   waveState: WaveState = "idle";
   nextWaveT = 90; // 开场 1.5s 后第一波
   spawnQueue: SpawnOrder[] = [];
-  // 技能 CD(帧,击发瞬间起算)
+  // 技能 CD(帧,击发瞬间起算)+ 波次解锁(第3波解锁双发,打赢第5波解锁散射)
   skillCd = { burst: 0, spread: 0 };
+  skillUnlocked = { burst: false, spread: false };
 
   get isTest(): boolean {
     return this.game.session?.isTest === true;
@@ -316,9 +318,15 @@ export class Battle {
 
   // ---------- 技能(无尽模式) ----------
 
-  /** 武装技能:CD 转完且未武装才可按;击发瞬间才起 CD */
+  /** 武装技能:需已解锁 + CD 转完且未武装;击发瞬间才起 CD */
   armSkill(kind: "burst" | "spread"): void {
     if (!this.isEndless || this.status !== "playing") return;
+    const unlocked = kind === "burst" ? this.skillUnlocked.burst : this.skillUnlocked.spread;
+    if (!unlocked) {
+      const w = SKILL_UNLOCK_WAVE[kind];
+      this.game.toast(kind === "burst" ? `双发:第 ${w} 波解锁` : `散射:打赢第 ${w - 1} 波解锁`);
+      return;
+    }
     const cd = kind === "burst" ? this.skillCd.burst : this.skillCd.spread;
     const armed = kind === "burst" ? this.player.armedBurst : this.player.armedSpread;
     if (cd > 0 || armed) return;
@@ -364,7 +372,20 @@ export class Battle {
   private startWave(): void {
     this.wave++;
     this.waveState = "spawning";
-    this.game.showWaveBanner(`第 ${this.wave} 波`);
+    // 波次横幅:播报本波新登场兵种
+    const debuts = ENDLESS_ROSTER.filter((r) => r.minWave === this.wave).map((r) => r.name);
+    this.game.showWaveBanner(`第 ${this.wave} 波${debuts.length > 0 ? ` · ${debuts.join("/")}登场!` : ""}`);
+    // 技能波次解锁(第3波双发;第6波开场=打赢第5波→散射)
+    if (this.wave >= SKILL_UNLOCK_WAVE.burst && !this.skillUnlocked.burst) {
+      this.skillUnlocked.burst = true;
+      this.game.toast("双发已解锁!按 Q 武装下一发");
+      this.fx.text(this.player.x, this.player.y - 84, "双发解锁!", "#ffcc00", 20);
+    }
+    if (this.wave >= SKILL_UNLOCK_WAVE.spread && !this.skillUnlocked.spread) {
+      this.skillUnlocked.spread = true;
+      this.game.toast("散射已解锁!按 E 武装下一发");
+      this.fx.text(this.player.x, this.player.y - 84, "散射解锁!", "#ffcc00", 20);
+    }
     // 工兵整地:每波开始表土复原(单层土岛被炸烂会困人/断绳可达性;波内破坏自由)
     if (this.wave > 1) {
       this.terrain.repairSoil();

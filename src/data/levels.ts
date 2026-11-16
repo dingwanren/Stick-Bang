@@ -231,5 +231,5 @@ export const ENDLESS_LEVEL: Level = {
     ground: [],
     fly: [],
   },
-  tip: "↑↓ 爬绳上天路 · Q 双发 · E 散射 · 弹药靠补给箱 · 生存到底!",
+  tip: "↑↓ 爬绳上天路 · 技能与强敌随波次解锁 · 弹药靠补给箱 · 生存到底!",
 };
